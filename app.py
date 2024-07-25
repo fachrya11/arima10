@@ -16,8 +16,27 @@ except FileNotFoundError:
 
 st.title('Data Historis Saham PT. Telkom')
 
-start_date = st.date_input('Start Date')
-end_date = st.date_input('End Date')
+# Load historical data
+try:
+    df_historical = pd.read_csv('D:\Proyek Data Mining\stock_prediction\data\Data Historis TLKM.csv')  # Pastikan path file benar
+    st.write("Data historis:")
+    st.write(df_historical.head())  # Tampilkan beberapa baris pertama untuk verifikasi
+    
+    if 'Tanggal' not in df_historical.columns:
+        raise KeyError("Kolom 'Tanggal' tidak ditemukan dalam data historis.")
+    
+    df_historical['Tanggal'] = pd.to_datetime(df_historical['Tanggal'])
+    df_historical.set_index('Tanggal', inplace=True)
+    st.success('Data historis berhasil dimuat')
+except FileNotFoundError:
+    st.error('File data historis tidak ditemukan. Pastikan path file benar.')
+    st.stop()
+except KeyError as e:
+    st.error(str(e))
+    st.stop()
+
+start_date = st.date_input('Start Date', value=datetime(2021, 1, 1))
+end_date = st.date_input('End Date', value=datetime.today())
 
 def predict(start_date, end_date):
     try:
@@ -35,7 +54,7 @@ def predict(start_date, end_date):
 
         # Prepare the results
         results = {
-            'date': date_range.strftime('%Y-%m-%d').tolist(),
+            'Tanggal': date_range.strftime('%Y-%m-%d').tolist(),
             'predictions': forecast.tolist()
         }
         
@@ -52,15 +71,18 @@ if st.button('Prediksi'):
             st.write('Terjadi kesalahan:', results['error'])
         else:
             # Create DataFrame from results
-            df = pd.DataFrame(results)
-            df['date'] = pd.to_datetime(df['date'])  # Convert date strings to datetime objects
-            df.set_index('date', inplace=True)  # Set date as index
+            df_predictions = pd.DataFrame(results)
+            df_predictions['Tanggal'] = pd.to_datetime(df_predictions['Tanggal'])  # Convert date strings to datetime objects
+            df_predictions.set_index('Tanggal', inplace=True)  # Set date as index
+            
+            # Merge with historical data
+            df_merged = df_historical.merge(df_predictions, how='outer', left_index=True, right_index=True, suffixes=('_historical', '_predicted'))
             
             # Display results as a table
             st.write('Hasil prediksi:')
-            st.dataframe(df)  # Menampilkan DataFrame sebagai tabel
+            st.dataframe(df_merged)  # Menampilkan DataFrame sebagai tabel
             
             # Display results as a line chart
-            st.line_chart(df)
+            st.line_chart(df_merged[['Terakhir', 'predictions']])
     else:
         st.write('Silakan masukkan tanggal mulai dan tanggal akhir.')
